@@ -1,0 +1,8 @@
+{
+  "files": ["src/assets/scripts/gulp-modules/ts/*.ts"],
+	"compilerOptions": {
+		"noImplicitAny": true,
+		"sourceMap": true,
+    "target": "es5"
+  }
+}
