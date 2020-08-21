@@ -29,9 +29,17 @@ const imageminPngquant = require('imagemin-pngquant');
 const svgSprites = require("gulp-svg-sprites");
 const cheerio = require('gulp-cheerio');
 const cleanSvg = require('gulp-cheerio-clean-svg');
+// eslint
+const eslint = require('gulp-eslint');
+
 // type script
-const ts = require("gulp-typescript");
-const tsProject = ts.createProject("tsconfig.json");
+const browserify = require("browserify");
+const source = require('vinyl-source-stream');
+const tsify = require("tsify");
+const buffer = require('vinyl-buffer');
+const glob = require("glob")
+const merge = require('merge-stream');
+const path = require('path');
 
 
 
@@ -53,7 +61,7 @@ const paths = {
 				dest: './dist/assets/scripts/'
 		},
 		ts: {
-				src: './src/assets/scripts/gulp-modules/ts/home.ts',
+				src: './src/assets/scripts/gulp-modules/ts/*.ts',
 				dest: './dist/assets/scripts/'
 		},
 		fonts: {
@@ -89,6 +97,7 @@ function watch() {
 		//gulp.watch(paths.scripts.src, scripts); //for webpack
 		gulp.watch(paths.gulpModules.src, gulpModules);
 		gulp.watch(paths.ts.src, typeScript);
+		gulp.watch(paths.ts.src, testJsLint);
 		gulp.watch(paths.images.src, images);
 		gulp.watch(paths.fonts.src, fonts);
 		gulp.watch(paths.libs.src, libs);
@@ -114,9 +123,17 @@ function clean() {
 
 // pug
 function templates() {
-		return gulp.src(paths.templates.pages)
-				.pipe(pug({ pretty: true }))
-				.pipe(gulp.dest(paths.root));
+	return gulp.src(paths.templates.pages)
+	.pipe(pug({ pretty: true }))
+	.pipe(gulp.dest(paths.root));
+}
+
+// eslint
+function testJsLint() {
+	return gulp.src(paths.ts.src).
+	pipe(eslint()).
+	pipe(eslint.format())
+	// .pipe(eslint.failAfterError());
 }
 
 // scss
@@ -204,42 +221,27 @@ function gulpModules() {
 }
 
 
-var browserify = require("browserify");
-var source = require('vinyl-source-stream');
-var tsify = require("tsify");
-var buffer = require('vinyl-buffer');
+
 //ts-scripts
 function typeScript() {
-
-
-
-	return browserify({
-		basedir: '.',
-		debug: true,
-		entries: [paths.ts.src],
-		cache: {},
-		packageCache: {}
-})
-	.plugin(tsify)
-	.bundle()
- .pipe(source('home.js'))
-	.pipe(buffer())
-	.pipe(sourcemaps.init({loadMaps: true}))
-	.pipe(uglify())
-	// .pipe(sourcemaps.write('./'))
-	.pipe(gulp.dest(paths.ts.dest));
-	
-		// return tsProject
-    // .src()
-    // .pipe(tsProject())
-    // .js.pipe(gulp.dest(paths.ts.dest));
+	var files = glob.sync(paths.ts.src);
+	return merge(files.map(function (file) {
+		return browserify({
+				entries: file,
+				debug: true
+			})
+			.plugin(tsify)
+			.bundle()
+			.pipe(source(path.basename(file, '.ts') + ".js"))
+			.pipe(buffer())
+			.pipe(sourcemaps.init({
+				loadMaps: true
+			}))
+			.pipe(uglify())
+			.pipe(sourcemaps.write("./"))
+			.pipe(gulp.dest(paths.ts.dest))
+	}));
 }
-
-
-
-
-
-
 
 
 
@@ -262,6 +264,7 @@ exports.styles = styles;
 //exports.scripts = scripts;
 exports.gulpModules = gulpModules;
 exports.typeScript = typeScript;
+exports.testJsLint = testJsLint;
 exports.images = images;
 exports.clean = clean;
 exports.fonts = fonts;
@@ -273,7 +276,7 @@ gulp.task('default', gulp.series(
 		svgSprite,
 		clean,
 		libs,
-		gulp.parallel(styles, templates, fonts, gulpModules, typeScript, images, static),
+		gulp.parallel(styles, templates, fonts, gulpModules, typeScript, testJsLint, images, static),
 		gulp.parallel(watch, server)
 ));
 
